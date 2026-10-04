@@ -2,6 +2,8 @@ const express = require('express');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const session = require('express-session');
+const fs = require('fs');
+const path = require('path');
 const { passport, googleOAuthConfigured } = require('./config/passport');
 const authRoutes = require('./routes/auth.routes');
 const contentRoutes = require('./routes/content.routes');
@@ -38,6 +40,18 @@ app.use('/api/performance', performanceRoutes);
 app.use('/api/revision', revisionRoutes);
 app.use('/api/exams', examRoutes);
 app.use('/api/admin', adminRoutes);
+
+// In the Railway single-service deployment, Express also serves the built SPA.
+// During local development Vite handles the frontend separately.
+const frontendDistPath = path.resolve(__dirname, '../frontend/dist');
+if (fs.existsSync(frontendDistPath)) {
+  app.use(express.static(frontendDistPath));
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api/')) return next();
+    return res.sendFile(path.join(frontendDistPath, 'index.html'), (error) => error && next(error));
+  });
+}
+
 app.use((error, _req, res, _next) => {
   console.error('API request failed:', error?.name || 'UnknownError');
   if (error instanceof SyntaxError && error.status === 400 && Object.hasOwn(error, 'body')) {
